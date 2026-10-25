@@ -1,0 +1,82 @@
+# ========================
+# Environment & Secrets — NEVER COMMIT
+# ========================
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+.Python
+
+# ========================
+# Virtual Environments
+# ========================
+venv/
+.venv/
+env/
+ENV/
+
+# ========================
+# Testing
+# ========================
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ========================
+# Linting & Type Checking
+# ========================
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ========================
+# Build / Distribution
+# ========================
+build/
+dist/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ========================
+# Database / Data
+# ========================
+*.db
+*.sqlite3
+*.sqlite
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/
+
+# ========================
+# IDE & OS
+# ========================
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ========================
+# PRD / planning docs
+# ========================
+PRD_*.md
+

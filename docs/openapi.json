@@ -1,0 +1,2314 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Renewable Energy Forecast Analysis API",
+    "description": "API serving UK national wind generation actuals, decision-time forecasts at configurable cutoffs, and accuracy analytics (MAE, RMSE, bias) over January 2026. Built for a utility's day-ahead procurement team.\n\n**Key concept:** The *decision cutoff* is the latest moment on D-1 at which forecasts are visible to the buyer. All forecast selection respects this cutoff.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness & readiness check",
+        "description": "Returns API status and whether the snapshot data has been loaded into memory.",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meta": {
+      "get": {
+        "tags": [
+          "Metadata"
+        ],
+        "summary": "API metadata and methodology",
+        "description": "Returns delivery window configuration, available cutoff times, snapshot info, and human-readable definitions of all metrics and calculations.",
+        "operationId": "get_meta_api_meta_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actuals": {
+      "get": {
+        "tags": [
+          "Data Series"
+        ],
+        "summary": "Raw actual wind generation series",
+        "description": "Returns raw actual wind generation records from the Elexon FUELHH dataset filtered by delivery date range. Useful for data transparency and debugging.",
+        "operationId": "get_actuals_api_actuals_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date (YYYY-MM-DD)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date (YYYY-MM-DD)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActualRecord"
+                  },
+                  "title": "Response Get Actuals Api Actuals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forecasts": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "summary": "Raw WINDFOR forecast series (all publish times)",
+        "description": "Returns raw forecast records from the Elexon WINDFOR dataset filtered by target delivery date range and optionally by publish datetime range. Supports pagination via limit/offset.",
+        "operationId": "get_forecasts_api_forecasts_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date (YYYY-MM-DD)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date (YYYY-MM-DD)"
+          },
+          {
+            "name": "publish_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional publish datetime lower bound (ISO UTC)",
+              "examples": [
+                "2026-01-01T00:00:00Z"
+              ],
+              "title": "Publish From"
+            },
+            "description": "Optional publish datetime lower bound (ISO UTC)"
+          },
+          {
+            "name": "publish_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional publish datetime upper bound (ISO UTC)",
+              "examples": [
+                "2026-01-31T23:59:59Z"
+              ],
+              "title": "Publish To"
+            },
+            "description": "Optional publish datetime upper bound (ISO UTC)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 10000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of records to return (pagination)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of records to return (pagination)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of records to skip (pagination)",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of records to skip (pagination)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ForecastRecord"
+                  },
+                  "title": "Response Get Forecasts Api Forecasts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forecasts/latest": {
+      "get": {
+        "tags": [
+          "Forecasts"
+        ],
+        "summary": "Latest-at-cutoff forecast per target period (E5)",
+        "description": "Returns, for each target half-hour period of the delivery day, the latest forecast published at or before the specified decision cutoff on D-1. This is the key 'what did the buyer see?' endpoint.",
+        "operationId": "get_latest_forecasts_api_forecasts_latest_get",
+        "parameters": [
+          {
+            "name": "delivery_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Target delivery date D (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-15"
+              ],
+              "title": "Delivery Date"
+            },
+            "description": "Target delivery date D (YYYY-MM-DD)"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff time in Europe/London on D-1 (HH:MM)",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff time in Europe/London on D-1 (HH:MM)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LatestForecastRecord"
+                  },
+                  "title": "Response Get Latest Forecasts Api Forecasts Latest Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/comparison": {
+      "get": {
+        "tags": [
+          "Comparison"
+        ],
+        "summary": "Actual vs latest-at-cutoff forecast for one delivery day (E6)",
+        "description": "Returns 48 half-hourly comparison points pairing actual wind generation with the latest forecast available at the decision cutoff on D-1. Includes summary KPIs (MAE, RMSE, bias) and an uncertainty band (\u00b1 RMSE).",
+        "operationId": "get_comparison_api_comparison_get",
+        "parameters": [
+          {
+            "name": "delivery_date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Delivery date D (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-15"
+              ],
+              "title": "Delivery Date"
+            },
+            "description": "Delivery date D (YYYY-MM-DD)"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff time (HH:MM) in Europe/London on D-1",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff time (HH:MM) in Europe/London on D-1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/comparison/range": {
+      "get": {
+        "tags": [
+          "Comparison"
+        ],
+        "summary": "Actual vs forecast comparison over a date range (E7)",
+        "description": "Returns comparison points for all half-hour periods in the specified delivery date range. Useful for month-view charts and scatter plots of actual vs forecast.",
+        "operationId": "get_comparison_range_api_comparison_range_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date (YYYY-MM-DD)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date (YYYY-MM-DD)",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date (YYYY-MM-DD)"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff time (HH:MM) in Europe/London on D-1",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff time (HH:MM) in Europe/London on D-1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonRangeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Overall accuracy KPIs for a delivery date range (E8)",
+        "description": "Computes MAE, RMSE, bias, normalised MAE, percentiles, coverage, and extremes for the latest-at-cutoff forecasts across the specified delivery date range.",
+        "operationId": "get_kpi_metrics_api_metrics_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff HH:MM",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff HH:MM"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KPIMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/daily": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Per-delivery-day accuracy metrics (E9)",
+        "description": "Returns MAE, RMSE, and bias broken down by individual delivery day.",
+        "operationId": "get_daily_metrics_api_metrics_daily_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff HH:MM",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff HH:MM"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/by-hour": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Error heatmap by delivery day \u00d7 hour, plus hourly profile (E10)",
+        "description": "Returns a heatmap of mean error and MAE for each delivery-day \u00d7 hour combination, plus an hourly profile aggregated across all days in the range.",
+        "operationId": "get_hourly_metrics_api_metrics_by_hour_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff HH:MM",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff HH:MM"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HourlyMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/by-horizon": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Accuracy by forecast lead-time horizon bucket (E11)",
+        "description": "Computes MAE, RMSE, and bias for all available forecast publish times grouped into horizon buckets. Uses ALL publish times (not only the latest-at-cutoff) to show how accuracy varies with lead time.",
+        "operationId": "get_horizon_metrics_api_metrics_by_horizon_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date"
+          },
+          {
+            "name": "bucket_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 24,
+              "minimum": 1,
+              "description": "Horizon bin size in hours",
+              "default": 3,
+              "title": "Bucket Hours"
+            },
+            "description": "Horizon bin size in hours"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HorizonMetricsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/errors/distribution": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Error distribution histogram and percentile summary (E12)",
+        "description": "Returns the full error distribution as equal-width histogram bins, along with mean, P05, P50, and P95 quantiles.",
+        "operationId": "get_error_distribution_api_errors_distribution_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive start delivery date",
+              "examples": [
+                "2026-01-01"
+              ],
+              "title": "Date From"
+            },
+            "description": "Inclusive start delivery date"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Inclusive end delivery date",
+              "examples": [
+                "2026-01-31"
+              ],
+              "title": "Date To"
+            },
+            "description": "Inclusive end delivery date"
+          },
+          {
+            "name": "cutoff",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Decision cutoff HH:MM",
+              "examples": [
+                "09:00"
+              ],
+              "default": "09:00",
+              "title": "Cutoff"
+            },
+            "description": "Decision cutoff HH:MM"
+          },
+          {
+            "name": "bins",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 5,
+              "description": "Number of histogram bins",
+              "default": 20,
+              "title": "Bins"
+            },
+            "description": "Number of histogram bins"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDistributionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/fetch": {
+      "post": {
+        "tags": [
+          "Data Ingestion"
+        ],
+        "summary": "Fetch and ingest data dynamically with custom field mappings",
+        "description": "Allows the frontend to specify API URLs or stream endpoints, date boundaries, and dynamic field names (e.g. for 'startTime', 'publishTime', 'generation') to fetch, clean, and hot-reload data into the backend.",
+        "operationId": "fetch_and_ingest_dynamic_data_api_data_fetch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DynamicIngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DynamicIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/refresh": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Re-fetch snapshot from Elexon and reload (E13)",
+        "description": "Triggers a fresh data fetch from Elexon BMRS APIs and reloads the in-memory repository. Protected by X-Admin-Token header. Disabled if ADMIN_TOKEN is not set.",
+        "operationId": "refresh_snapshot_api_admin_refresh_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActualRecord": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target half-hour start time in ISO UTC"
+          },
+          "generation_mw": {
+            "type": "number",
+            "title": "Generation Mw",
+            "description": "Actual wind generation in MW"
+          },
+          "settlement_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Date",
+            "description": "Settlement date (YYYY-MM-DD)"
+          },
+          "settlement_period": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Period",
+            "description": "Settlement period (1..48)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "generation_mw"
+        ],
+        "title": "ActualRecord",
+        "description": "E3 /api/actuals record schema."
+      },
+      "ActualsFieldMapping": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target timestamp field name (e.g. 'startTime')",
+            "default": "startTime",
+            "examples": [
+              "startTime"
+            ]
+          },
+          "generation": {
+            "type": "string",
+            "title": "Generation",
+            "description": "Generation value field name (e.g. 'generation')",
+            "default": "generation",
+            "examples": [
+              "generation"
+            ]
+          },
+          "fuel_type_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuel Type Field",
+            "description": "Optional field to filter by fuel type",
+            "default": "fuelType",
+            "examples": [
+              "fuelType"
+            ]
+          },
+          "fuel_type_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuel Type Value",
+            "description": "Fuel type value to filter on (e.g. 'WIND')",
+            "default": "WIND",
+            "examples": [
+              "WIND"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ActualsFieldMapping",
+        "description": "Dynamic field name mappings for actual generation data."
+      },
+      "ActualsSourceRequest": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Direct API URL or stream endpoint (e.g. Elexon FUELHH stream)",
+            "examples": [
+              "https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH/stream"
+            ]
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From",
+            "description": "Delivery date range start (YYYY-MM-DD)",
+            "examples": [
+              "2026-01-01"
+            ]
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date To",
+            "description": "Delivery date range end (YYYY-MM-DD)",
+            "examples": [
+              "2026-01-31"
+            ]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/ActualsFieldMapping",
+            "description": "Dynamic field names in the incoming actuals payload/response"
+          },
+          "records": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Records",
+            "description": "Optional direct JSON records supplied by frontend"
+          }
+        },
+        "type": "object",
+        "title": "ActualsSourceRequest",
+        "description": "Source configuration and optional records for actuals."
+      },
+      "ComparisonPoint": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target settlement start time (ISO UTC)"
+          },
+          "actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Mw",
+            "description": "Actual wind generation in MW"
+          },
+          "forecast_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Mw",
+            "description": "Forecast wind generation at decision cutoff in MW"
+          },
+          "forecast_publish_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Publish Time",
+            "description": "Publish time of the selected forecast"
+          },
+          "horizon_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Hours",
+            "description": "Forecast lead time in hours"
+          },
+          "error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Mw",
+            "description": "Forecast error (forecast - actual) in MW"
+          },
+          "abs_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abs Error Mw",
+            "description": "Absolute forecast error in MW"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time"
+        ],
+        "title": "ComparisonPoint",
+        "description": "Comparison point for a single settlement half-hour."
+      },
+      "ComparisonRangeResponse": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "title": "Date From",
+            "description": "Range start date",
+            "examples": [
+              "2026-01-01"
+            ]
+          },
+          "date_to": {
+            "type": "string",
+            "title": "Date To",
+            "description": "Range end date",
+            "examples": [
+              "2026-01-31"
+            ]
+          },
+          "cutoff_local": {
+            "type": "string",
+            "title": "Cutoff Local",
+            "description": "Cutoff time in Europe/London on D-1",
+            "examples": [
+              "09:00"
+            ]
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "Comparison points for all target periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "cutoff_local",
+          "points"
+        ],
+        "title": "ComparisonRangeResponse",
+        "description": "E7 /api/comparison/range response schema across multiple delivery days."
+      },
+      "ComparisonResponse": {
+        "properties": {
+          "delivery_date": {
+            "type": "string",
+            "title": "Delivery Date",
+            "description": "Delivery day (YYYY-MM-DD)",
+            "examples": [
+              "2026-01-15"
+            ]
+          },
+          "cutoff_local": {
+            "type": "string",
+            "title": "Cutoff Local",
+            "description": "Cutoff time in Europe/London on D-1",
+            "examples": [
+              "09:00"
+            ]
+          },
+          "cutoff_utc": {
+            "type": "string",
+            "title": "Cutoff Utc",
+            "description": "Cutoff timestamp in ISO UTC"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ComparisonPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "48 half-hourly comparison points"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ComparisonSummary"
+          },
+          "uncertainty": {
+            "$ref": "#/components/schemas/UncertaintyBand"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delivery_date",
+          "cutoff_local",
+          "cutoff_utc",
+          "points",
+          "summary",
+          "uncertainty"
+        ],
+        "title": "ComparisonResponse",
+        "description": "E6 /api/comparison response schema for a single delivery day."
+      },
+      "ComparisonSummary": {
+        "properties": {
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw",
+            "description": "Mean Absolute Error in MW"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw",
+            "description": "Root Mean Squared Error in MW"
+          },
+          "bias_mw": {
+            "type": "number",
+            "title": "Bias Mw",
+            "description": "Mean signed error (bias) in MW"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "title": "Coverage Pct",
+            "description": "Percentage of periods with forecast available"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Count of evaluated half-hour periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "coverage_pct",
+          "n"
+        ],
+        "title": "ComparisonSummary",
+        "description": "Statistical summary for the comparison day or range."
+      },
+      "DailyMetricRow": {
+        "properties": {
+          "delivery_date": {
+            "type": "string",
+            "title": "Delivery Date",
+            "examples": [
+              "2026-01-15"
+            ]
+          },
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "type": "number",
+            "title": "Bias Mw"
+          },
+          "mean_actual_mw": {
+            "type": "number",
+            "title": "Mean Actual Mw"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delivery_date",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "mean_actual_mw",
+          "n"
+        ],
+        "title": "DailyMetricRow",
+        "description": "Daily evaluation row."
+      },
+      "DailyMetricsResponse": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DailyMetricRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "DailyMetricsResponse",
+        "description": "E9 /api/metrics/daily response schema."
+      },
+      "DeliveryWindow": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "title": "Start",
+            "description": "Start date (YYYY-MM-DD)",
+            "examples": [
+              "2026-01-01"
+            ]
+          },
+          "end": {
+            "type": "string",
+            "title": "End",
+            "description": "End date (YYYY-MM-DD)",
+            "examples": [
+              "2026-01-31"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "DeliveryWindow",
+        "description": "Delivery date boundary model."
+      },
+      "DistributionBin": {
+        "properties": {
+          "from_mw": {
+            "type": "number",
+            "title": "From Mw",
+            "description": "Bin lower bound in MW"
+          },
+          "to_mw": {
+            "type": "number",
+            "title": "To Mw",
+            "description": "Bin upper bound in MW"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Number of error occurrences in this bin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_mw",
+          "to_mw",
+          "count"
+        ],
+        "title": "DistributionBin",
+        "description": "Histogram bin for error distribution."
+      },
+      "DynamicIngestRequest": {
+        "properties": {
+          "actuals": {
+            "$ref": "#/components/schemas/ActualsSourceRequest"
+          },
+          "forecasts": {
+            "$ref": "#/components/schemas/ForecastsSourceRequest"
+          },
+          "save_as_snapshot": {
+            "type": "boolean",
+            "title": "Save As Snapshot",
+            "description": "Whether to persist to disk as the active Parquet snapshot",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "actuals",
+          "forecasts"
+        ],
+        "title": "DynamicIngestRequest",
+        "description": "Frontend request to fetch or ingest data dynamically with custom field mappings."
+      },
+      "DynamicIngestResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "actual_rows": {
+            "type": "integer",
+            "title": "Actual Rows"
+          },
+          "forecast_rows": {
+            "type": "integer",
+            "title": "Forecast Rows"
+          },
+          "delivery_window": {
+            "$ref": "#/components/schemas/DeliveryWindow"
+          },
+          "actual_fields_mapped": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Actual Fields Mapped"
+          },
+          "forecast_fields_mapped": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Forecast Fields Mapped"
+          },
+          "fetched_at": {
+            "type": "string",
+            "title": "Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "actual_rows",
+          "forecast_rows",
+          "delivery_window",
+          "actual_fields_mapped",
+          "forecast_fields_mapped",
+          "fetched_at"
+        ],
+        "title": "DynamicIngestResponse",
+        "description": "Response returned after processing dynamic data ingestion."
+      },
+      "ErrorDistributionResponse": {
+        "properties": {
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/DistributionBin"
+            },
+            "type": "array",
+            "title": "Bins"
+          },
+          "mean_mw": {
+            "type": "number",
+            "title": "Mean Mw"
+          },
+          "p05_mw": {
+            "type": "number",
+            "title": "P05 Mw"
+          },
+          "p50_mw": {
+            "type": "number",
+            "title": "P50 Mw"
+          },
+          "p95_mw": {
+            "type": "number",
+            "title": "P95 Mw"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bins",
+          "mean_mw",
+          "p05_mw",
+          "p50_mw",
+          "p95_mw",
+          "n"
+        ],
+        "title": "ErrorDistributionResponse",
+        "description": "E12 /api/errors/distribution response schema."
+      },
+      "ForecastRecord": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target half-hour start time in ISO UTC"
+          },
+          "publish_time": {
+            "type": "string",
+            "title": "Publish Time",
+            "description": "Publish time of forecast in ISO UTC"
+          },
+          "generation_mw": {
+            "type": "number",
+            "title": "Generation Mw",
+            "description": "Forecasted wind generation in MW"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "publish_time",
+          "generation_mw"
+        ],
+        "title": "ForecastRecord",
+        "description": "E4 /api/forecasts record schema."
+      },
+      "ForecastsFieldMapping": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target timestamp field name (e.g. 'startTime')",
+            "default": "startTime",
+            "examples": [
+              "startTime"
+            ]
+          },
+          "publish_time": {
+            "type": "string",
+            "title": "Publish Time",
+            "description": "Publish/creation timestamp field name (e.g. 'publishTime')",
+            "default": "publishTime",
+            "examples": [
+              "publishTime"
+            ]
+          },
+          "generation": {
+            "type": "string",
+            "title": "Generation",
+            "description": "Forecasted generation field name (e.g. 'generation')",
+            "default": "generation",
+            "examples": [
+              "generation"
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ForecastsFieldMapping",
+        "description": "Dynamic field name mappings for forecast generation data."
+      },
+      "ForecastsSourceRequest": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Direct API URL or stream endpoint (e.g. Elexon WINDFOR stream)",
+            "examples": [
+              "https://data.elexon.co.uk/bmrs/api/v1/datasets/WINDFOR/stream"
+            ]
+          },
+          "publish_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publish From",
+            "description": "Publish datetime lower bound (ISO UTC)",
+            "examples": [
+              "2025-12-22T00:00:00Z"
+            ]
+          },
+          "publish_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publish To",
+            "description": "Publish datetime upper bound (ISO UTC)",
+            "examples": [
+              "2026-01-31T23:59:59Z"
+            ]
+          },
+          "fields": {
+            "$ref": "#/components/schemas/ForecastsFieldMapping",
+            "description": "Dynamic field names in the incoming forecast payload/response"
+          },
+          "records": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Records",
+            "description": "Optional direct JSON records supplied by frontend"
+          }
+        },
+        "type": "object",
+        "title": "ForecastsSourceRequest",
+        "description": "Source configuration and optional records for forecasts."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "data_loaded": {
+            "type": "boolean",
+            "title": "Data Loaded"
+          },
+          "snapshot_fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Fetched At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "data_loaded",
+          "snapshot_fetched_at"
+        ],
+        "title": "HealthResponse",
+        "description": "Health check response."
+      },
+      "HorizonMetricRow": {
+        "properties": {
+          "horizon_from_h": {
+            "type": "number",
+            "title": "Horizon From H",
+            "description": "Start of lead bucket in hours"
+          },
+          "horizon_to_h": {
+            "type": "number",
+            "title": "Horizon To H",
+            "description": "End of lead bucket in hours"
+          },
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "type": "number",
+            "title": "Bias Mw"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizon_from_h",
+          "horizon_to_h",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "n"
+        ],
+        "title": "HorizonMetricRow",
+        "description": "Accuracy metrics for a forecast horizon lead bucket."
+      },
+      "HorizonMetricsResponse": {
+        "properties": {
+          "bucket_hours": {
+            "type": "integer",
+            "title": "Bucket Hours",
+            "examples": [
+              3
+            ]
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonMetricRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bucket_hours",
+          "rows"
+        ],
+        "title": "HorizonMetricsResponse",
+        "description": "E11 /api/metrics/by-horizon response schema."
+      },
+      "HourlyHeatmapCell": {
+        "properties": {
+          "delivery_date": {
+            "type": "string",
+            "title": "Delivery Date",
+            "examples": [
+              "2026-01-15"
+            ]
+          },
+          "hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour"
+          },
+          "mean_error_mw": {
+            "type": "number",
+            "title": "Mean Error Mw"
+          },
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delivery_date",
+          "hour",
+          "mean_error_mw",
+          "mae_mw"
+        ],
+        "title": "HourlyHeatmapCell",
+        "description": "Single heatmap cell for day x hour."
+      },
+      "HourlyMetricsResponse": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/HourlyHeatmapCell"
+            },
+            "type": "array",
+            "title": "Cells"
+          },
+          "by_hour_of_day": {
+            "items": {
+              "$ref": "#/components/schemas/HourlyProfileRow"
+            },
+            "type": "array",
+            "title": "By Hour Of Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cells",
+          "by_hour_of_day"
+        ],
+        "title": "HourlyMetricsResponse",
+        "description": "E10 /api/metrics/by-hour response schema."
+      },
+      "HourlyProfileRow": {
+        "properties": {
+          "hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour"
+          },
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "type": "number",
+            "title": "Bias Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hour",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw"
+        ],
+        "title": "HourlyProfileRow",
+        "description": "Hourly profile row across all days."
+      },
+      "KPIMetricsResponse": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "title": "Date From",
+            "examples": [
+              "2026-01-01"
+            ]
+          },
+          "date_to": {
+            "type": "string",
+            "title": "Date To",
+            "examples": [
+              "2026-01-31"
+            ]
+          },
+          "cutoff_local": {
+            "type": "string",
+            "title": "Cutoff Local",
+            "examples": [
+              "09:00"
+            ]
+          },
+          "mae_mw": {
+            "type": "number",
+            "title": "Mae Mw",
+            "description": "Mean Absolute Error in MW"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw",
+            "description": "Root Mean Squared Error in MW"
+          },
+          "bias_mw": {
+            "type": "number",
+            "title": "Bias Mw",
+            "description": "Signed bias in MW"
+          },
+          "nmae_pct": {
+            "type": "number",
+            "title": "Nmae Pct",
+            "description": "Normalised MAE percentage"
+          },
+          "mean_actual_mw": {
+            "type": "number",
+            "title": "Mean Actual Mw",
+            "description": "Mean actual wind generation in MW"
+          },
+          "mean_forecast_mw": {
+            "type": "number",
+            "title": "Mean Forecast Mw",
+            "description": "Mean forecast generation in MW"
+          },
+          "error_p05_mw": {
+            "type": "number",
+            "title": "Error P05 Mw",
+            "description": "5th percentile of error in MW"
+          },
+          "error_p50_mw": {
+            "type": "number",
+            "title": "Error P50 Mw",
+            "description": "50th percentile (median) error in MW"
+          },
+          "error_p95_mw": {
+            "type": "number",
+            "title": "Error P95 Mw",
+            "description": "95th percentile of error in MW"
+          },
+          "max_over_forecast_mw": {
+            "type": "number",
+            "title": "Max Over Forecast Mw",
+            "description": "Maximum over-forecast error in MW"
+          },
+          "max_under_forecast_mw": {
+            "type": "number",
+            "title": "Max Under Forecast Mw",
+            "description": "Maximum under-forecast error in MW"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "title": "Coverage Pct",
+            "description": "Forecast coverage percentage"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Total half-hours evaluated"
+          },
+          "bias_direction": {
+            "type": "string",
+            "title": "Bias Direction",
+            "description": "'over_forecast' | 'under_forecast' | 'neutral'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "cutoff_local",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "nmae_pct",
+          "mean_actual_mw",
+          "mean_forecast_mw",
+          "error_p05_mw",
+          "error_p50_mw",
+          "error_p95_mw",
+          "max_over_forecast_mw",
+          "max_under_forecast_mw",
+          "coverage_pct",
+          "n",
+          "bias_direction"
+        ],
+        "title": "KPIMetricsResponse",
+        "description": "E8 /api/metrics response schema for overall KPIs."
+      },
+      "LatestForecastRecord": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "title": "Start Time",
+            "description": "Target half-hour start time in ISO UTC"
+          },
+          "forecast_publish_time": {
+            "type": "string",
+            "title": "Forecast Publish Time",
+            "description": "Publish time of selected forecast in ISO UTC"
+          },
+          "forecast_mw": {
+            "type": "number",
+            "title": "Forecast Mw",
+            "description": "Forecasted wind generation in MW"
+          },
+          "horizon_hours": {
+            "type": "number",
+            "title": "Horizon Hours",
+            "description": "Forecast horizon in hours (startTime - publishTime)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "forecast_publish_time",
+          "forecast_mw",
+          "horizon_hours"
+        ],
+        "title": "LatestForecastRecord",
+        "description": "E5 /api/forecasts/latest record schema."
+      },
+      "MetaResponse": {
+        "properties": {
+          "delivery_window": {
+            "$ref": "#/components/schemas/DeliveryWindow"
+          },
+          "default_cutoff": {
+            "type": "string",
+            "title": "Default Cutoff",
+            "description": "Default decision cutoff time",
+            "examples": [
+              "09:00"
+            ]
+          },
+          "cutoff_timezone": {
+            "type": "string",
+            "title": "Cutoff Timezone",
+            "description": "Timezone for cutoff",
+            "examples": [
+              "Europe/London"
+            ]
+          },
+          "available_cutoffs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Cutoffs",
+            "description": "Predefined available cutoff options"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/SnapshotMeta"
+          },
+          "definitions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Definitions",
+            "description": "Metric and calculation definitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "delivery_window",
+          "default_cutoff",
+          "cutoff_timezone",
+          "available_cutoffs",
+          "snapshot",
+          "definitions"
+        ],
+        "title": "MetaResponse",
+        "description": "E2 /api/meta response schema."
+      },
+      "RefreshResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "actual_rows": {
+            "type": "integer",
+            "title": "Actual Rows"
+          },
+          "forecast_rows": {
+            "type": "integer",
+            "title": "Forecast Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "actual_rows",
+          "forecast_rows"
+        ],
+        "title": "RefreshResponse",
+        "description": "Response for admin snapshot refresh."
+      },
+      "SnapshotMeta": {
+        "properties": {
+          "fetched_at": {
+            "type": "string",
+            "title": "Fetched At",
+            "description": "ISO UTC timestamp when snapshot was fetched"
+          },
+          "actual_rows": {
+            "type": "integer",
+            "title": "Actual Rows",
+            "description": "Number of actual wind records loaded"
+          },
+          "forecast_rows": {
+            "type": "integer",
+            "title": "Forecast Rows",
+            "description": "Number of forecast records loaded"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "Data source attribution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched_at",
+          "actual_rows",
+          "forecast_rows",
+          "source"
+        ],
+        "title": "SnapshotMeta",
+        "description": "Metadata regarding pre-loaded snapshot data."
+      },
+      "UncertaintyBand": {
+        "properties": {
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "Calculation methodology",
+            "default": "historical_rmse"
+          },
+          "rmse_mw": {
+            "type": "number",
+            "title": "Rmse Mw",
+            "description": "Calculated RMSE in MW"
+          },
+          "lower_offset_mw": {
+            "type": "number",
+            "title": "Lower Offset Mw",
+            "description": "Negative offset from forecast (-RMSE)"
+          },
+          "upper_offset_mw": {
+            "type": "number",
+            "title": "Upper Offset Mw",
+            "description": "Positive offset from forecast (+RMSE)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rmse_mw",
+          "lower_offset_mw",
+          "upper_offset_mw"
+        ],
+        "title": "UncertaintyBand",
+        "description": "Uncertainty interval parameters (+/- RMSE)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes"
+    },
+    {
+      "name": "Metadata",
+      "description": "API configuration and methodology"
+    },
+    {
+      "name": "Data Series",
+      "description": "Raw FUELHH actuals and WINDFOR forecasts"
+    },
+    {
+      "name": "Forecasts",
+      "description": "Forecast series with latest-at-cutoff selection"
+    },
+    {
+      "name": "Comparison",
+      "description": "Actual vs forecast paired comparisons"
+    },
+    {
+      "name": "Metrics",
+      "description": "Accuracy metrics, aggregations, and distributions"
+    },
+    {
+      "name": "Admin",
+      "description": "Administrative operations"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "fetched_at": "2026-10-25T03:45:17.666265+00:00",
+  "delivery_start": "2026-01-01",
+  "delivery_end": "2026-01-31",
+  "actual_rows": 1488,
+  "forecast_rows": 18104,
+  "source": "Elexon BMRS FUELHH/WINDFOR",
+  "actuals_file": "actuals_wind.parquet",
+  "forecasts_file": "forecasts_wind.parquet"
+}
