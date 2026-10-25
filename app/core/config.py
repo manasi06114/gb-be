@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     # Security & CORS
     cors_origins: list[str] | str = [
+        "*",
         "https://gb-fe-psi.vercel.app",
         "http://localhost:5173",
         "http://localhost:3000",

@@ -86,10 +86,11 @@ def create_app() -> FastAPI:
     # Request-ID and latency logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
-    # CORS
+    # CORS: Allow all origins and all Vercel deployments (*.vercel.app)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.cors_origins if isinstance(settings.cors_origins, list) else ["*"],
+        allow_origin_regex=r"https?://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
