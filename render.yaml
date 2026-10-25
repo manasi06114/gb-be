@@ -13,7 +13,7 @@ services:
       - key: HOST
         value: 0.0.0.0
       - key: CORS_ORIGINS
-        sync: false
+        value: '["https://gb-fe-psi.vercel.app","http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173"]'
       - key: ADMIN_TOKEN
         generateValue: true
       - key: SERVE_FRONTEND
@@ -29,7 +29,7 @@ services:
       - key: CUTOFF_TIMEZONE
         value: Europe/London
       - key: AVAILABLE_CUTOFFS
-        value: '[\"06:00\",\"09:00\",\"10:00\",\"12:00\"]'
+        value: '["06:00","09:00","10:00","12:00"]'
       - key: ELEXON_BASE_URL
         value: https://data.elexon.co.uk/bmrs/api/v1
       - key: CHUNK_DAYS

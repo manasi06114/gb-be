@@ -4,6 +4,7 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,7 +24,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Security & CORS
-    cors_origins: list[str] = [
+    cors_origins: list[str] | str = [
+        "https://gb-fe-psi.vercel.app",
         "http://localhost:5173",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
@@ -41,7 +43,23 @@ class Settings(BaseSettings):
     delivery_end: date = date(2026, 1, 31)
     default_cutoff: str = "09:00"
     cutoff_timezone: str = "Europe/London"
-    available_cutoffs: list[str] = ["06:00", "09:00", "10:00", "12:00"]
+    available_cutoffs: list[str] | str = ["06:00", "09:00", "10:00", "12:00"]
+
+    @field_validator("cors_origins", "available_cutoffs", mode="before")
+    @classmethod
+    def assemble_string_list(cls, v: object) -> list[str] | object:
+        """Allow string inputs formatted as JSON or comma-separated lists."""
+        import json
+
+        if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                try:
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [i.strip() for i in v.split(",") if i.strip()]
+        return v
 
     # Elexon API Ingestion
     elexon_base_url: str = "https://data.elexon.co.uk/bmrs/api/v1"
